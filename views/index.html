@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html ng-app="app">
+<head>
+    <title>Live Tweet</title>
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
+    <style>
+        body {
+            padding-top: 30px;
+        }
+
+        input {
+            border: none !important;
+            box-shadow: none !important;
+        }
+
+        button {
+            border: none !important;
+            box-shadow: none !important;
+        }
+    </style>
+</head>
+<body ng-controller="appCtrl" class="container">
+
+<input type="text" class="form-control" placeholder="Filter. Type something..." ng-model="search">
+<input type="checkbox" ng-model="famous"> From Famous (follower >= 500)
+
+<div class="panel panel-default">
+    <div class="btn-group btn-group-justified">
+        <div class="btn-group">
+            <button class="btn btn-primary" ng-click="togglePlay()">
+                <span class="glyphicon glyphicon-play" ng-show="!play"> Play</span>
+                <span class="glyphicon glyphicon-pause" ng-show="play"> Pause</span>
+            </button>
+        </div>
+    </div>
+    <div class="panel-body">
+        <div class="media" ng-repeat="tweet in tweets">
+            <a class="pull-left" href="#">
+                <img class="media-object" ng-src="{{tweet.user.profile_image_url }}" alt="Img">
+            </a>
+            <div class="media-body">
+                <h4 class="media-heading">{{ tweet.user.name }}</h4>
+                {{ tweet.text }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    var io = io.connect();
+</script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/angular.js/1.2.16/angular.min.js"></script>
+<script>
+    var app = angular.module('app', [])
+        .service('socketio', ['$rootScope',
+            function ($rootScope) {
+                function on(e, cfn) {
+                    io.on(e, function () {
+                        var args = arguments;
+                        $rootScope.$apply(function () {
+                            cfn.apply(io, args);
+                        });
+                    });
+                }
+
+                function emit(e, data, cfn) {
+                    io.emit(e, data, function () {
+                        var args = arguments;
+                        $rootScope.$apply(function () {
+                            cfn.apply(io, args);
+                        });
+                    });
+                }
+
+                return {
+                    on: on,
+                    emit: emit
+                };
+            }
+        ])
+        .filter('fromFamous', function () {
+            return function (tweets) {
+                var temp = [];
+                for (i in tweets) {
+                    if (tweets[i].user.followers_count > 500) {
+                        temp.push(tweets[i]);
+                    }
+                }
+                return temp;
+            };
+        })
+        .controller('appCtrl', ['$scope', 'socketio', '$filter',
+            function ($scope, socketio, $filter) {
+                $scope.play = true;
+                $scope.famous = false;
+
+                socketio.emit('live:start');
+
+                $scope.togglePlay = function () {
+                    $scope.play = $scope.play ? false : true;
+                }
+
+                $scope.tweets = [];
+                socketio.on('tweet', function (data) {
+                    if ($scope.play) {
+                        data = data.data;
+                        var res = $filter('filter')([data], $scope.search);
+
+                        if ($scope.famous && typeof res[0] !== 'undefined') {
+                            res = $filter('fromFamous')([res[0]]);
+                        }
+
+                        if (typeof res[0] !== 'undefined') {
+                            $scope.tweets.unshift(res[0]);
+                        }
+
+                        if ($scope.tweets.length > 20) {
+                            $scope.tweets.pop();
+                        }
+                    }
+                });
+            }
+        ]);
+</script>
+</body>
+</html>

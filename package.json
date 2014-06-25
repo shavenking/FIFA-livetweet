@@ -1,0 +1,10 @@
+{
+  "name": "livetweet",
+  "version": "0.0.0",
+  "dependencies": {
+    "express.io": "^1.1.13",
+    "sleep": "^1.1.8",
+    "twitter": "^0.2.9"
+  },
+  "devDependencies": {}
+}
